@@ -13,5 +13,5 @@ required.forEach((key) => {
 export const env = {
   databaseUrl: process.env.DATABASE_URL as string,
   jwtSecret: process.env.JWT_SECRET as string,
-  port: Number(process.env.PORT ?? 4000),
+  port: Number(process.env.PORT ?? 8080),
 };
