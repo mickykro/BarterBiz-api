@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { healthRouter } from "./health.js";
 import { authRouter } from "./auth.js";
 import { businessRouter } from "./business.js";
 import { opportunityRouter } from "./opportunities.js";
@@ -11,7 +10,6 @@ import { notificationRouter } from "./notifications.js";
 
 export const apiRouter = Router();
 
-apiRouter.use(healthRouter);
 apiRouter.use(authRouter);
 apiRouter.use(businessRouter);
 apiRouter.use(opportunityRouter);
@@ -20,3 +18,4 @@ apiRouter.use(dealRouter);
 apiRouter.use(messageRouter);
 apiRouter.use(ratingRouter);
 apiRouter.use(notificationRouter);
+
