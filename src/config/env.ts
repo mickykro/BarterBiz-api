@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const required = ["DATABASE_URL", "JWT_SECRET", "PORT"] as const;
+const required = ["DATABASE_URL", "JWT_SECRET"] as const;
 
 required.forEach((key) => {
   if (!process.env[key]) {
