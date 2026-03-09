@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core entities per MVP scope
+model User {
+  id            String   @id @default(uuid())
+  fullName      String
+  email         String   @unique
+  passwordHash  String
+  authProvider  String   @default("email")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  businesses    Business[]
+}
+
+model Business {
+  id                   String             @id @default(uuid())
+  userId               String
+  businessName         String
+  category             String
+  description          String
+  locationCity         String
+  locationRegion       String
+  logoUrl              String?
+  ratingAvg            Float    @default(0)
+  ratingCount          Int      @default(0)
+  collaborationsCount  Int      @default(0)
+  isVerified           Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user                 User      @relation(fields: [userId], references: [id])
+  services             BusinessService[]
+  opportunities        Opportunity[]
+  sentProposals        Proposal[]        @relation("SentProposals")
+  receivedProposals    Proposal[]        @relation("ReceivedProposals")
+  dealsA               Deal[]            @relation("DealBusinessA")
+  dealsB               Deal[]            @relation("DealBusinessB")
+  dealParticipants     DealParticipant[]
+  notifications        Notification[]
+  ratingsGiven         Rating[]          @relation("RatingFrom")
+  ratingsReceived      Rating[]          @relation("RatingTo")
+  savedOpportunities   SavedOpportunity[]
+  socialLinks          BusinessSocialLink[]
+  media                BusinessMedia[]
+  dealMessages         DealMessage[]     @relation("BusinessDealMessages")
+
+  @@unique([userId])
+}
+
+model BusinessService {
+  id           String   @id @default(uuid())
+  businessId   String
+  serviceName  String
+  serviceType  ServiceType
+  category     String
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  business     Business @relation(fields: [businessId], references: [id])
+  needOpportunities  Opportunity[] @relation("OpportunityNeed")
+  offerOpportunities Opportunity[] @relation("OpportunityOffer")
+}
+
+enum ServiceType {
+  offer
+  need
+}
+
+model Opportunity {
+  id                String        @id @default(uuid())
+  businessId        String
+  title             String
+  needServiceId     String?
+  needServiceText   String?
+  offerServiceId    String?
+  offerServiceText  String?
+  description       String
+  locationCity      String
+  locationRegion    String
+  visibilityScope   VisibilityScope
+  status            OpportunityStatus @default(active)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  business          Business @relation(fields: [businessId], references: [id])
+  needService       BusinessService? @relation("OpportunityNeed", fields: [needServiceId], references: [id])
+  offerService      BusinessService? @relation("OpportunityOffer", fields: [offerServiceId], references: [id])
+  proposals         Proposal[]
+  savedBy           SavedOpportunity[]
+}
+
+enum OpportunityStatus {
+  active
+  paused
+  closed
+}
+
+enum VisibilityScope {
+  local
+  countrywide
+}
+
+model Proposal {
+  id                   String   @id @default(uuid())
+  fromBusinessId       String
+  toBusinessId         String
+  opportunityId        String?
+  offeredServiceText   String
+  requestedServiceText String
+  message              String?
+  status               ProposalStatus @default(pending)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  fromBusiness   Business    @relation("SentProposals", fields: [fromBusinessId], references: [id])
+  toBusiness     Business    @relation("ReceivedProposals", fields: [toBusinessId], references: [id])
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id])
+  deal           Deal?
+}
+
+enum ProposalStatus {
+  pending
+  accepted
+  rejected
+  countered
+  cancelled
+}
+
+model Deal {
+  id                    String   @id @default(uuid())
+  proposalId            String? @unique
+  businessAId           String
+  businessBId           String
+  serviceADescription   String
+  serviceBDescription   String
+  agreementDescription  String?
+  status                DealStatus @default(approved)
+  startDate             DateTime?
+  targetEndDate         DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  proposal       Proposal?  @relation(fields: [proposalId], references: [id])
+  businessA      Business   @relation("DealBusinessA", fields: [businessAId], references: [id])
+  businessB      Business   @relation("DealBusinessB", fields: [businessBId], references: [id])
+  participants   DealParticipant[]
+  messages       DealMessage[]
+  ratings        Rating[]
+}
+
+enum DealStatus {
+  approved
+  in_progress
+  completed
+  cancelled
+  disputed
+  closed
+}
+
+model DealParticipant {
+  id               String   @id @default(uuid())
+  dealId           String
+  businessId       String
+  executionStatus  ExecutionStatus @default(not_started)
+  markedCompletedAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deal             Deal     @relation(fields: [dealId], references: [id])
+  business         Business @relation(fields: [businessId], references: [id])
+}
+
+enum ExecutionStatus {
+  not_started
+  in_progress
+  completed
+}
+
+model DealMessage {
+  id               String   @id @default(uuid())
+  dealId           String
+  senderBusinessId String
+  messageType      MessageType @default(text)
+  messageText      String?
+  mediaUrl         String?
+  createdAt        DateTime @default(now())
+
+  deal             Deal     @relation(fields: [dealId], references: [id])
+  senderBusiness   Business @relation("BusinessDealMessages", fields: [senderBusinessId], references: [id])
+}
+
+enum MessageType {
+  text
+  image
+  link
+  system
+}
+
+model Rating {
+  id                String   @id @default(uuid())
+  dealId            String
+  fromBusinessId    String
+  toBusinessId      String
+  qualityScore      Int
+  reliabilityScore  Int
+  communicationScore Int
+  reviewText        String?
+  createdAt         DateTime @default(now())
+
+  deal              Deal     @relation(fields: [dealId], references: [id])
+  fromBusiness      Business @relation("RatingFrom", fields: [fromBusinessId], references: [id])
+  toBusiness        Business @relation("RatingTo", fields: [toBusinessId], references: [id])
+
+  @@unique([dealId, fromBusinessId, toBusinessId])
+}
+
+model Notification {
+  id                 String   @id @default(uuid())
+  businessId         String
+  type               String
+  title              String
+  body               String
+  relatedEntityType  String?
+  relatedEntityId    String?
+  isRead             Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  business           Business @relation(fields: [businessId], references: [id])
+}
+
+// Optional helpers
+model SavedOpportunity {
+  id             String   @id @default(uuid())
+  businessId     String
+  opportunityId  String
+  createdAt      DateTime @default(now())
+
+  business       Business    @relation(fields: [businessId], references: [id])
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@unique([businessId, opportunityId])
+}
+
+model BusinessMedia {
+  id          String   @id @default(uuid())
+  businessId  String
+  mediaUrl    String
+  mediaType   String
+  createdAt   DateTime @default(now())
+
+  business    Business @relation(fields: [businessId], references: [id])
+}
+
+model BusinessSocialLink {
+  id          String   @id @default(uuid())
+  businessId  String
+  platform    String
+  url         String
+  createdAt   DateTime @default(now())
+
+  business    Business @relation(fields: [businessId], references: [id])
+}
