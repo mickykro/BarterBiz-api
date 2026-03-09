@@ -7,6 +7,18 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Request logger – helps diagnose Railway routing issues
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Root route for basic connectivity test
+app.get("/", (_req, res) => {
+  res.json({ status: "ok", service: "barterbiz-api", port: env.port });
+});
+
 app.use(apiRouter);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -14,6 +26,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(env.port, () => {
-  console.log(`BarterBiz API running on port ${env.port}`);
+// Bind to 0.0.0.0 – required by Railway
+app.listen(env.port, "0.0.0.0", () => {
+  console.log(`BarterBiz API running on 0.0.0.0:${env.port}`);
 });
