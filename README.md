@@ -34,5 +34,32 @@ Backend for BarterBiz MVP: Express + Prisma + PostgreSQL with JWT auth and barte
 - Railway command: `npm run start` (ensure `npm run build` runs first).
 - Set env vars in Railway: `DATABASE_URL`, `JWT_SECRET`, `PORT` (Railway injects `PORT`; keep fallback 4000 locally).
 
+### Railway Deployment Troubleshooting
+
+**If you see 404 errors on Railway but the service shows ONLINE:**
+
+1. **Verify environment variables are set:**
+   - Go to Railway dashboard → Project → Variables
+   - Ensure `DATABASE_URL` is set (use `${{ Postgres.DATABASE_URL }}` reference if using Railway Postgres)
+   - Ensure `JWT_SECRET` is set to a secure random string
+
+2. **Check deployment logs:**
+   - Railway → Deployments → Latest → View Logs
+   - Look for `[STARTUP] ✅ BarterBiz API running on 0.0.0.0:4000`
+   - If you see `Missing required environment variables`, the env vars aren't being injected
+
+3. **Verify domain routing:**
+   - Railway → Public Networking → Ensure domain points to port `4000`
+   - Domain should be configured as `https://your-domain.railway.app` → `0.0.0.0:4000`
+
+4. **Test the health endpoint:**
+   - Try: `curl https://your-domain.railway.app/health`
+   - Should return: `{"ok": true}`
+
+5. **If still failing:**
+   - Redeploy: Railway → Deployments → Redeploy Latest
+   - Check that `railway.json` exists in the root directory
+   - Verify `npm run build` completes successfully in build logs
+
 ### QA flows covered
 - Signup/login, business profile, services, opportunities, proposals → deals, messaging, completion, ratings, notifications.

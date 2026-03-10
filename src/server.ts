@@ -3,13 +3,15 @@ import cors from "cors";
 import { apiRouter } from "./routes/index.js";
 import { env } from "./config/env.js";
 
+console.log("[STARTUP] Loading environment configuration...");
+
 // Global error handlers – catch async crashes after startup
 process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
+  console.error("[ERROR] Uncaught Exception:", err);
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
+  console.error("[ERROR] Unhandled Rejection:", reason);
 });
 
 const app = express();
@@ -45,8 +47,26 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: "Internal server error" });
 });
 
-const PORT = Number(process.env.PORT) || 4000;
+const PORT = env.port;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`BarterBiz API running on 0.0.0.0:${PORT}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[STARTUP] ✅ BarterBiz API running on 0.0.0.0:${PORT}`);
+  console.log(`[STARTUP] Database: ${env.databaseUrl.substring(0, 50)}...`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("[SHUTDOWN] SIGTERM received, closing server...");
+  server.close(() => {
+    console.log("[SHUTDOWN] Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("[SHUTDOWN] SIGINT received, closing server...");
+  server.close(() => {
+    console.log("[SHUTDOWN] Server closed");
+    process.exit(0);
+  });
 });
