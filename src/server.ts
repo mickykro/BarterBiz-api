@@ -36,9 +36,16 @@ app.get("/", (_req, res) => {
 });
 
 // Health check
-app.get("/health", (_req, res) => {
+app.get("/health", async (_req, res) => {
   console.log("[DEBUG] Health check hit");
-  res.status(200).json({ ok: true });
+  try {
+    const { prisma } = await import("./lib/prisma.js");
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ ok: true, database: "connected" });
+  } catch (error: any) {
+    console.error("[DEBUG] Health check DB error:", error.message);
+    res.status(200).json({ ok: true, database: "disconnected", error: error.message });
+  }
 });
 
 // API routes
@@ -63,9 +70,19 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 const PORT = env.port;
 
-const server = app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[STARTUP] ✅ BarterBiz API running on 0.0.0.0:${PORT}`);
   console.log(`[STARTUP] Database: ${env.databaseUrl.substring(0, 50)}...`);
+  
+  try {
+    const { prisma } = await import("./lib/prisma.js");
+    await prisma.$connect();
+    console.log("[STARTUP] ✅ Database connection successful");
+  } catch (error) {
+    console.error("[STARTUP] ❌ Database connection failed:", error);
+    // We don't exit here to allow the health check to still respond if possible, 
+    // though Railway might kill it if the DB is required for health.
+  }
 });
 
 // Graceful shutdown
