@@ -22,11 +22,13 @@ app.use(express.json());
 // Request logger
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[DEBUG] Headers: ${JSON.stringify(req.headers)}`);
   next();
 });
 
 // Root route
 app.get("/", (_req, res) => {
+  console.log("[DEBUG] Root route hit");
   res.status(200).json({
     ok: true,
     message: "BarterBiz API is live",
@@ -35,16 +37,28 @@ app.get("/", (_req, res) => {
 
 // Health check
 app.get("/health", (_req, res) => {
+  console.log("[DEBUG] Health check hit");
   res.status(200).json({ ok: true });
 });
 
 // API routes
 app.use(apiRouter);
 
+// 404 Catch-all (to confirm it's Express returning 404)
+app.use((req, res) => {
+  console.log(`[DEBUG] 404 Not Found: ${req.method} ${req.url}`);
+  res.status(404).json({
+    error: "Not Found",
+    method: req.method,
+    url: req.url,
+    hint: "If you expect this route to exist, check your route definitions in src/routes/"
+  });
+});
+
 // Error handler
-app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: "Internal server error" });
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[ERROR] Middleware Error:", err);
+  res.status(500).json({ error: "Internal server error", details: err.message });
 });
 
 const PORT = env.port;
