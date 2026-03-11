@@ -22,20 +22,10 @@ app.use(express.json());
 // Request logger
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log(`[DEBUG] Headers: ${JSON.stringify(req.headers)}`);
   next();
 });
 
-// Root route
-app.get("/", (_req, res) => {
-  console.log("[DEBUG] Root route hit");
-  res.status(200).json({
-    ok: true,
-    message: "BarterBiz API is live",
-  });
-});
-
-// Health check
+// Health check - define this FIRST to avoid any middleware issues
 app.get("/health", async (_req, res) => {
   console.log("[DEBUG] Health check hit");
   try {
@@ -46,6 +36,15 @@ app.get("/health", async (_req, res) => {
     console.error("[DEBUG] Health check DB error:", error.message);
     res.status(200).json({ ok: true, database: "disconnected", error: error.message });
   }
+});
+
+// Root route
+app.get("/", (_req, res) => {
+  console.log("[DEBUG] Root route hit");
+  res.status(200).json({
+    ok: true,
+    message: "BarterBiz API is live",
+  });
 });
 
 // API routes
@@ -68,7 +67,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ error: "Internal server error", details: err.message });
 });
 
-const PORT = env.port;
+// Use PORT from env or default to 4000
+const PORT = Number(process.env.PORT) || 4000;
 
 const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[STARTUP] ✅ BarterBiz API running on 0.0.0.0:${PORT}`);
@@ -80,8 +80,6 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     console.log("[STARTUP] ✅ Database connection successful");
   } catch (error) {
     console.error("[STARTUP] ❌ Database connection failed:", error);
-    // We don't exit here to allow the health check to still respond if possible, 
-    // though Railway might kill it if the DB is required for health.
   }
 });
 
