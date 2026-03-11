@@ -1,31 +1,41 @@
 import express from "express";
 import cors from "cors";
-import { apiRouter } from "./routes/index.js";
 import { env } from "./config/env.js";
 
-console.log("[STARTUP] Loading environment configuration...");
+// Explicitly import each router to avoid any "apiRouter" mounting issues in production
+import { authRouter } from "./routes/auth.js";
+import { businessRouter } from "./routes/business.js";
+import { opportunityRouter } from "./routes/opportunities.js";
+import { proposalRouter } from "./routes/proposals.js";
+import { dealRouter } from "./routes/deals.js";
+import { messageRouter } from "./routes/messages.js";
+import { ratingRouter } from "./rating.js"; // Note: Checked filename consistency
+import { notificationRouter } from "./notifications.js";
 
-// Global error handlers – catch async crashes after startup
+console.log("[STARTUP] 🚀 BarterBiz API Starting...");
+
+// Global error handlers
 process.on("uncaughtException", (err) => {
-  console.error("[ERROR] Uncaught Exception:", err);
+  console.error("[FATAL] Uncaught Exception:", err);
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error("[ERROR] Unhandled Rejection:", reason);
+  console.error("[FATAL] Unhandled Rejection:", reason);
 });
 
 const app = express();
 
+// Standard Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Request logger
+// Request logger for ALL incoming traffic
 app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl || req.url}`);
   next();
 });
 
-// Health check - define this FIRST to avoid any middleware issues
+// 1. Health check - defined at the very top
 app.get("/health", async (_req, res) => {
   console.log("[DEBUG] Health check hit");
   try {
@@ -38,58 +48,54 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-// Root route
+// 2. Root route
 app.get("/", (_req, res) => {
-  console.log("[DEBUG] Root route hit");
-  res.status(200).json({
-    ok: true,
-    message: "BarterBiz API is live",
-  });
+  res.status(200).json({ ok: true, message: "BarterBiz API is live" });
 });
 
-// API routes - Explicitly mounting under /api prefix to avoid root-level confusion if needed,
-// but for now keeping it as is and adding a debug log to list all routes.
-app.use(apiRouter);
+// 3. Explicitly Mount Routes to ensure they are registered in the Express stack
+console.log("[STARTUP] Mounting API Routes...");
+app.use(authRouter);
+app.use(businessRouter);
+app.use(opportunityRouter);
+app.use(proposalRouter);
+app.use(dealRouter);
+app.use(messageRouter);
+app.use(ratingRouter);
+app.use(notificationRouter);
 
-// Debug: List all registered routes on startup
-function printRoutes(stack: any[], prefix = "") {
-  stack.forEach((layer) => {
-    if (layer.route) {
-      const methods = Object.keys(layer.route.methods).join(", ").toUpperCase();
-      console.log(`[ROUTE] ${methods} ${prefix}${layer.route.path}`);
-    } else if (layer.name === "router" && layer.handle.stack) {
-      printRoutes(layer.handle.stack, prefix + (layer.regexp.source.replace("^\\/", "").replace("\\/?(?=\\/|$)", "") || ""));
-    }
-  });
-}
-
-// 404 Catch-all (to confirm it's Express returning 404)
+// 4. Final 404 Catch-all with Detailed Debugging
 app.use((req, res) => {
-  console.log(`[DEBUG] 404 Not Found: ${req.method} ${req.url}`);
+  console.log(`[DEBUG] ❌ 404 Not Found: ${req.method} ${req.url}`);
+  console.log(`[DEBUG] Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
   res.status(404).json({
-    error: "Not Found",
+    error: "Route Not Found",
     method: req.method,
-    url: req.url,
-    hint: "If you expect this route to exist, check your route definitions in src/routes/"
+    path: req.url,
+    fullUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+    hint: "If this works locally but not on Railway, check if Railway's proxy is adding a prefix or if the route mounting failed in the build."
   });
 });
 
-// Error handler
+// 5. Global Error Handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("[ERROR] Middleware Error:", err);
+  console.error("[ERROR] Server Error:", err);
   res.status(500).json({ error: "Internal server error", details: err.message });
 });
 
-// Use PORT from env or default to 4000
 const PORT = Number(process.env.PORT) || 4000;
 
 const server = app.listen(PORT, "0.0.0.0", async () => {
-  console.log(`[STARTUP] ✅ BarterBiz API running on 0.0.0.0:${PORT}`);
-  console.log(`[STARTUP] Database: ${env.databaseUrl.substring(0, 50)}...`);
+  console.log(`[STARTUP] ✅ Server listening on 0.0.0.0:${PORT}`);
   
-  console.log("[STARTUP] Registered Routes:");
-  printRoutes(app._router.stack);
-  
+  // Debug: List all routes currently in the stack
+  console.log("[STARTUP] Registered Routes in Express Stack:");
+  app._router.stack.forEach((r: any) => {
+    if (r.route && r.route.path) {
+      console.log(`[ROUTE] ${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
+    }
+  });
+
   try {
     const { prisma } = await import("./lib/prisma.js");
     await prisma.$connect();
@@ -102,14 +108,6 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
 // Graceful shutdown
 process.on("SIGTERM", () => {
   console.log("[SHUTDOWN] SIGTERM received, closing server...");
-  server.close(() => {
-    console.log("[SHUTDOWN] Server closed");
-    process.exit(0);
-  });
-});
-
-process.on("SIGINT", () => {
-  console.log("[SHUTDOWN] SIGINT received, closing server...");
   server.close(() => {
     console.log("[SHUTDOWN] Server closed");
     process.exit(0);
