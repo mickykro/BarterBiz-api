@@ -47,8 +47,21 @@ app.get("/", (_req, res) => {
   });
 });
 
-// API routes
+// API routes - Explicitly mounting under /api prefix to avoid root-level confusion if needed,
+// but for now keeping it as is and adding a debug log to list all routes.
 app.use(apiRouter);
+
+// Debug: List all registered routes on startup
+function printRoutes(stack: any[], prefix = "") {
+  stack.forEach((layer) => {
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods).join(", ").toUpperCase();
+      console.log(`[ROUTE] ${methods} ${prefix}${layer.route.path}`);
+    } else if (layer.name === "router" && layer.handle.stack) {
+      printRoutes(layer.handle.stack, prefix + (layer.regexp.source.replace("^\\/", "").replace("\\/?(?=\\/|$)", "") || ""));
+    }
+  });
+}
 
 // 404 Catch-all (to confirm it's Express returning 404)
 app.use((req, res) => {
@@ -73,6 +86,9 @@ const PORT = Number(process.env.PORT) || 4000;
 const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[STARTUP] ✅ BarterBiz API running on 0.0.0.0:${PORT}`);
   console.log(`[STARTUP] Database: ${env.databaseUrl.substring(0, 50)}...`);
+  
+  console.log("[STARTUP] Registered Routes:");
+  printRoutes(app._router.stack);
   
   try {
     const { prisma } = await import("./lib/prisma.js");
