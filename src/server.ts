@@ -2,15 +2,8 @@ import express from "express";
 import cors from "cors";
 import { env } from "./config/env.js";
 
-// Explicitly import each router to avoid any "apiRouter" mounting issues in production
-import { authRouter } from "./routes/auth.js";
-import { businessRouter } from "./routes/business.js";
-import { opportunityRouter } from "./routes/opportunities.js";
-import { proposalRouter } from "./routes/proposals.js";
-import { dealRouter } from "./routes/deals.js";
-import { messageRouter } from "./routes/messages.js";
-import { ratingRouter } from "./rating.js"; // Note: Checked filename consistency
-import { notificationRouter } from "./notifications.js";
+// Import the main apiRouter which contains all sub-routes
+import { apiRouter } from "./routes/index.js";
 
 console.log("[STARTUP] 🚀 BarterBiz API Starting...");
 
@@ -53,16 +46,13 @@ app.get("/", (_req, res) => {
   res.status(200).json({ ok: true, message: "BarterBiz API is live" });
 });
 
-// 3. Explicitly Mount Routes to ensure they are registered in the Express stack
-console.log("[STARTUP] Mounting API Routes...");
-app.use(authRouter);
-app.use(businessRouter);
-app.use(opportunityRouter);
-app.use(proposalRouter);
-app.use(dealRouter);
-app.use(messageRouter);
-app.use(ratingRouter);
-app.use(notificationRouter);
+// 3. Explicitly Mount API Routes under /api prefix
+// This ensures both /auth/login AND /api/auth/login can be supported if desired,
+// but standardizing on /api/ is best practice.
+console.log("[STARTUP] Mounting API Routes under /api prefix...");
+app.use("/api", apiRouter);
+// Also mount without prefix to support existing clients if needed
+app.use(apiRouter);
 
 // 4. Final 404 Catch-all with Detailed Debugging
 app.use((req, res) => {
@@ -73,7 +63,7 @@ app.use((req, res) => {
     method: req.method,
     path: req.url,
     fullUrl: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
-    hint: "If this works locally but not on Railway, check if Railway's proxy is adding a prefix or if the route mounting failed in the build."
+    hint: "If this works locally but not on Railway, check if you are using the correct domain and path prefix (/api/)."
   });
 });
 
@@ -88,14 +78,6 @@ const PORT = Number(process.env.PORT) || 4000;
 const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[STARTUP] ✅ Server listening on 0.0.0.0:${PORT}`);
   
-  // Debug: List all routes currently in the stack
-  console.log("[STARTUP] Registered Routes in Express Stack:");
-  app._router.stack.forEach((r: any) => {
-    if (r.route && r.route.path) {
-      console.log(`[ROUTE] ${Object.keys(r.route.methods).join(',').toUpperCase()} ${r.route.path}`);
-    }
-  });
-
   try {
     const { prisma } = await import("./lib/prisma.js");
     await prisma.$connect();
