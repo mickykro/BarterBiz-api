@@ -40,9 +40,25 @@ businessRouter.post("/businesses/me", requireAuth, async (req: AuthRequest, res)
 });
 
 businessRouter.get("/businesses/me", requireAuth, async (req: AuthRequest, res) => {
+  console.log("req.userId", req.userId);
   const business = await prisma.business.findFirst({ where: { userId: req.userId }, include: { services: true } });
   if (!business) return res.status(404).json({ error: "Business not found" });
   res.json(business);
+});
+
+businessRouter.get("/businesses", requireAuth, async (req: AuthRequest, res) => {
+  const myBusiness = await prisma.business.findFirst({ where: { userId: req.userId } });
+
+  const businesses = await prisma.business.findMany({
+    where: {
+      isActive: true,
+      ...(myBusiness ? { id: { not: myBusiness.id } } : {}),
+    },
+    include: { services: true },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+  res.json(businesses);
 });
 
 businessRouter.get("/businesses/:id", async (req, res) => {
