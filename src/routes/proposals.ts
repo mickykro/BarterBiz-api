@@ -190,6 +190,66 @@ proposalRouter.post("/proposals/:id/counter", requireAuth, async (req: AuthReque
   res.json(updated);
 });
 
+proposalRouter.get("/proposals/:id/messages", requireAuth, async (req: AuthRequest, res) => {
+  const business = await prisma.business.findFirst({ where: { userId: req.userId } });
+  if (!business) return res.status(400).json({ error: "Create a business first" });
+
+  const proposal = await prisma.proposal.findUnique({ where: { id: req.params.id } });
+  if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+  if (proposal.fromBusinessId !== business.id && proposal.toBusinessId !== business.id) return res.status(403).json({ error: "Forbidden" });
+
+  const messages = await prisma.proposalMessage.findMany({
+    where: { proposalId: proposal.id },
+    orderBy: { createdAt: "asc" },
+  });
+  res.json(messages);
+});
+
+proposalRouter.post("/proposals/:id/messages", requireAuth, async (req: AuthRequest, res) => {
+  const { messageText } = req.body;
+  if (!messageText || typeof messageText !== "string") return res.status(400).json({ error: "messageText required" });
+
+  const business = await prisma.business.findFirst({ where: { userId: req.userId } });
+  if (!business) return res.status(400).json({ error: "Create a business first" });
+
+  const proposal = await prisma.proposal.findUnique({ where: { id: req.params.id } });
+  if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+  if (proposal.fromBusinessId !== business.id && proposal.toBusinessId !== business.id) return res.status(403).json({ error: "Forbidden" });
+
+  const message = await prisma.proposalMessage.create({
+    data: {
+      proposalId: proposal.id,
+      senderBusinessId: business.id,
+      messageText,
+    },
+  });
+
+  const recipientId = business.id === proposal.fromBusinessId ? proposal.toBusinessId : proposal.fromBusinessId;
+  await notify(recipientId, {
+    type: "message_received",
+    title: "New message",
+    body: "You received a new message on a proposal",
+    relatedEntityType: "proposal",
+    relatedEntityId: proposal.id,
+  });
+
+  res.status(201).json(message);
+});
+
+proposalRouter.get("/proposals/:id/deal", requireAuth, async (req: AuthRequest, res) => {
+  const business = await prisma.business.findFirst({ where: { userId: req.userId } });
+  if (!business) return res.status(400).json({ error: "Create a business first" });
+
+  const proposal = await prisma.proposal.findUnique({ where: { id: req.params.id } });
+  if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+  if (proposal.fromBusinessId !== business.id && proposal.toBusinessId !== business.id) return res.status(403).json({ error: "Forbidden" });
+
+  const deal = await prisma.deal.findFirst({ where: { proposalId: proposal.id } });
+  if (!deal) return res.status(404).json({ error: "No deal found for this proposal" });
+
+  res.json(deal);
+});
+
 proposalRouter.post("/proposals/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
   const business = await prisma.business.findFirst({ where: { userId: req.userId } });
   if (!business) return res.status(400).json({ error: "Create a business first" });

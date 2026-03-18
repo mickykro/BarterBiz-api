@@ -53,6 +53,7 @@ model Business {
   socialLinks          BusinessSocialLink[]
   media                BusinessMedia[]
   dealMessages         DealMessage[]     @relation("BusinessDealMessages")
+  proposalMessages     ProposalMessage[] @relation("BusinessProposalMessages")
 
   @@unique([userId])
 }
@@ -127,6 +128,18 @@ model Proposal {
   toBusiness     Business    @relation("ReceivedProposals", fields: [toBusinessId], references: [id])
   opportunity    Opportunity? @relation(fields: [opportunityId], references: [id])
   deal           Deal?
+  messages       ProposalMessage[]
+}
+
+model ProposalMessage {
+  id               String   @id @default(uuid())
+  proposalId       String
+  senderBusinessId String
+  messageText      String
+  createdAt        DateTime @default(now())
+
+  proposal         Proposal @relation(fields: [proposalId], references: [id])
+  senderBusiness   Business @relation("BusinessProposalMessages", fields: [senderBusinessId], references: [id])
 }
 
 enum ProposalStatus {
